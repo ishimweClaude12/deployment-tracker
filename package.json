@@ -1,0 +1,16 @@
+{
+  "name": "deployment-tracker",
+  "version": "1.0.0",
+  "description": "simple nodejs app for tracking deployment versioning on aws",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ishimweClaude12/deployment-tracker.git"
+  },
+  "license": "ISC",
+  "author": "ish",
+  "type": "commonjs",
+  "main": "app.js",
+  "scripts": {
+    "test": "npm run test"
+  }
+}
