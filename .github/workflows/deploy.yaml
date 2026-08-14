@@ -1,0 +1,82 @@
+name: Deploy to Elastic Beanstalk
+
+on:
+  push:
+    branches: [main]
+
+# Required so the job can request a short-lived OIDC token from GitHub
+# and exchange it for temporary AWS credentials. No AWS keys are stored.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-north-1
+  EB_APPLICATION: deployment-tracker
+  EB_ENVIRONMENT: deployment-tracker-prod
+  S3_BUCKET: elasticbeanstalk-eu-north-1-448049788660
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build a unique version label
+        id: version
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "label=v${PKG_VERSION}-${GITHUB_SHA::7}-$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Create deployment bundle
+        run: |
+          zip -r application.zip . \
+            -x "*.git*" \
+            -x "node_modules/*" \
+            -x "test/*" \
+            -x "application.zip"
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload bundle to S3
+        run: |
+          aws s3 cp application.zip \
+            "s3://${S3_BUCKET}/deployment-tracker/${{ steps.version.outputs.label }}.zip"
+
+      - name: Create Elastic Beanstalk application version
+        run: |
+          aws elasticbeanstalk create-application-version \
+            --application-name "$EB_APPLICATION" \
+            --version-label "${{ steps.version.outputs.label }}" \
+            --source-bundle S3Bucket="${S3_BUCKET}",S3Key="deployment-tracker/${{ steps.version.outputs.label }}.zip" \
+            --auto-create-application
+
+      - name: Deploy the new version
+        run: |
+          aws elasticbeanstalk update-environment \
+            --application-name "$EB_APPLICATION" \
+            --environment-name "$EB_ENVIRONMENT" \
+            --version-label "${{ steps.version.outputs.label }}"
+
+      - name: Wait for the deployment to finish
+        run: |
+          aws elasticbeanstalk wait environment-updated \
+            --application-name "$EB_APPLICATION" \
+            --environment-names "$EB_ENVIRONMENT"
