@@ -33,6 +33,26 @@ app.get('/deployments', async (req, res) => {
   }
 });
 
+app.get('/deployments/latest', async (req, res) => {
+  try {
+    const result = await docClient.send(new ScanCommand({ TableName: TABLE_NAME }));
+    const items = result.Items || [];
+
+    if (items.length === 0) {
+      return res.status(404).json({ error: 'No deployments found' });
+    }
+
+    const latest = items.reduce((a, b) =>
+      new Date(a.deployedAt) > new Date(b.deployedAt) ? a : b
+    );
+
+    res.json(latest);
+  } catch (err) {
+    console.error('Failed to fetch latest deployment', err);
+    res.status(500).json({ error: 'Failed to fetch latest deployment' });
+  }
+});
+
 app.post('/deployments', async (req, res) => {
   const { version, deployedAt } = req.body || {};
 
@@ -52,6 +72,19 @@ app.post('/deployments', async (req, res) => {
     console.error('Failed to create deployment', err);
     res.status(500).json({ error: 'Failed to create deployment' });
   }
+});
+
+app.get('/endpoints', (req, res) => {
+  const endpoints = app.router.stack
+    .filter((layer) => layer.route)
+    .flatMap((layer) =>
+      Object.keys(layer.route.methods).map((method) => ({
+        method: method.toUpperCase(),
+        path: layer.route.path,
+      }))
+    );
+
+  res.json(endpoints);
 });
 
 app.use((req, res) => {
