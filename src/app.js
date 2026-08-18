@@ -1,11 +1,9 @@
+const crypto = require('node:crypto');
 const express = require('express');
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, ScanCommand, PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { ScanCommand, PutCommand } = require('@aws-sdk/lib-dynamodb');
+const docClient = require('./database/dynamodb');
 
 const TABLE_NAME = process.env.DEPLOYMENTS_TABLE || 'deployments';
-
-const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
-const docClient = DynamoDBDocumentClient.from(client);
 
 const app = express();
 app.disable('x-powered-by');
@@ -54,14 +52,17 @@ app.get('/deployments/latest', async (req, res) => {
 });
 
 app.post('/deployments', async (req, res) => {
-  const { version, deployedAt } = req.body || {};
+  const { version, environment, status, deployedAt } = req.body || {};
 
   if (!version) {
     return res.status(400).json({ error: 'version is required' });
   }
 
   const item = {
+    id: `deployment-${crypto.randomUUID()}`,
     version,
+    environment: environment || 'production',
+    status: status || 'successful',
     deployedAt: deployedAt || new Date().toISOString(),
   };
 
