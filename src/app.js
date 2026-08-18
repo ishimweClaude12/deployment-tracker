@@ -3,7 +3,7 @@ const express = require('express');
 const { ScanCommand, PutCommand } = require('@aws-sdk/lib-dynamodb');
 const docClient = require('./database/dynamodb');
 
-const TABLE_NAME = process.env.DEPLOYMENTS_TABLE || 'deployments';
+const TABLE_NAME = process.env.DYNAMODB_TABLE || "deployment-tracker";
 
 const app = express();
 app.disable('x-powered-by');
@@ -26,7 +26,7 @@ app.get('/deployments', async (req, res) => {
     const result = await docClient.send(new ScanCommand({ TableName: TABLE_NAME }));
     res.json(result.Items || []);
   } catch (err) {
-    console.error('Failed to fetch deployments', err);
+    console.error("Failed to fetch deployments, table:", TABLE_NAME, err);
     res.status(500).json({ error: 'Failed to fetch deployments' });
   }
 });
