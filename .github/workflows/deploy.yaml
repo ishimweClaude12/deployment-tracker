@@ -3,6 +3,8 @@ name: Deploy to Elastic Beanstalk
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 # Required so the job can request a short-lived OIDC token from GitHub
 # and exchange it for temporary AWS credentials. No AWS keys are stored.
